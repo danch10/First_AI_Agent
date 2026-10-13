@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 input.wav
 .idea/
+tasks.json
