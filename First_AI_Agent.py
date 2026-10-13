@@ -24,6 +24,8 @@ def load_tasks():
     return []
 
 def save_tasks(tasks):
+    for i, task in enumerate(tasks, start=1):
+        task["id"] = i
     with open(TASKS_FILE, "w") as f:
         json.dump(tasks, f, indent=2)
 
@@ -33,6 +35,16 @@ def add_task(title):
     tasks.append(task)
     save_tasks(tasks)
     return f"Added task: '{title}'"
+
+def delete_task(title):
+    tasks = load_tasks()
+    task = next((t for t in tasks if t.get("title") == title), None)
+    if not task:
+        return f"Didn't find the task: '{title}'"
+    tasks.remove(task)
+
+    save_tasks(tasks)
+    return f"Deleted task: '{title}'"
 
 def get_tasks():
     tasks = load_tasks()
@@ -68,6 +80,17 @@ tools = [
         }
     },
     {
+        "name": "delete_task",
+        "description": "Delete a required task from the user's task list.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "The task to add"}
+            },
+            "required": ["title"]
+        }
+    },
+    {
         "name": "get_tasks",
         "description": "Get all tasks from the user's task list.",
         "input_schema": {
@@ -93,6 +116,8 @@ tools = [
 def run_tool(tool_name, tool_input):
     if tool_name == "add_task":
         return add_task(tool_input["title"])
+    elif tool_name == "delete_task":
+        return delete_task(tool_input["title"])
     elif tool_name == "get_tasks":
         return get_tasks()
     elif tool_name == "complete_task":
