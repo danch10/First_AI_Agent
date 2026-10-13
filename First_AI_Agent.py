@@ -65,6 +65,13 @@ def complete_task(task_id):
             return f"Marked '{t['title']}' as done."
     return f"No task found with id {task_id}."
 
+def clear_completed():
+    tasks = load_tasks()
+    removed = [t for t in tasks if t["done"] == True]
+    tasks = [t for t in tasks if t["done"] == False]
+    save_tasks(tasks)
+    return f"Cleared {len(removed)} completed tasks."
+
 # ─── Tool definitions (what Claude sees) ──────────────────────────────────────
 
 tools = [
@@ -107,6 +114,14 @@ tools = [
                 "task_id": {"type": "integer", "description": "The ID of the task to mark as done"}
             },
             "required": ["task_id"]
+        }
+    },
+    {
+        "name": "clear_completed",
+        "description": "Remove all completed tasks from the user's task list.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
         }
     }
 ]
