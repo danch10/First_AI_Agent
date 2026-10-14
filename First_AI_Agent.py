@@ -29,6 +29,26 @@ def save_tasks(tasks):
     with open(TASKS_FILE, "w") as f:
         json.dump(tasks, f, indent=2)
 
+def search_tasks(keyword):
+    tasks = load_tasks()
+    lines = []
+    for t in tasks:
+        if keyword.lower() in t["title"].lower():
+            lines.append(f"{t['id']}. {t['title']}")
+    if not lines:
+        return f"No tasks found matching '{keyword}'."
+    return "\n".join(lines)
+
+def get_tasks():
+    tasks = load_tasks()
+    if not tasks:
+        return "Your task list is empty."
+    lines = []
+    for t in tasks:
+        status = "⬜"
+        lines.append(f"{status} {t['id']}. {t['title']}")
+    return "\n".join(lines)
+
 def add_task(title):
     tasks = load_tasks()
     task = {"id": len(tasks) + 1, "title": title, "done": False}
@@ -42,39 +62,39 @@ def delete_task(title):
     if not task:
         return f"Didn't find the task: '{title}'"
     tasks.remove(task)
-
     save_tasks(tasks)
     return f"Deleted task: '{title}'"
 
-def get_tasks():
+def complete_tasks(task_names):
     tasks = load_tasks()
-    if not tasks:
-        return "Your task list is empty."
-    lines = []
-    for t in tasks:
-        status = "✅" if t["done"] else "⬜"
-        lines.append(f"{status} {t['id']}. {t['title']}")
-    return "\n".join(lines)
-
-def complete_task(task_id):
-    tasks = load_tasks()
-    for t in tasks:
-        if t["id"] == task_id:
-            t["done"] = True
-            save_tasks(tasks)
-            return f"Marked '{t['title']}' as done."
-    return f"No task found with id {task_id}."
-
-def clear_completed():
-    tasks = load_tasks()
-    removed = [t for t in tasks if t["done"] == True]
-    tasks = [t for t in tasks if t["done"] == False]
+    titles = [t["title"] for t in tasks if t["title"] in task_names]
+    if not titles:
+        return "No matching tasks found."
+    tasks = [t for t in tasks if t["title"] not in task_names]
     save_tasks(tasks)
-    return f"Cleared {len(removed)} completed tasks."
+    return f"Completed and removed: {', '.join(titles)}"
 
 # ─── Tool definitions (what Claude sees) ──────────────────────────────────────
 
 tools = [
+    {
+        "name": "search_tasks",
+        "description": "Get all tasks from the user's task list that have the same keyword.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"keyword": {"type": "string", "description": "The keyword to search for"}
+        },
+        "required": ["keyword"]
+        }
+    },
+    {
+        "name": "get_tasks",
+        "description": "Get all tasks from the user's task list.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
+    },
     {
         "name": "add_task",
         "description": "Add a new task to the user's task list.",
@@ -98,30 +118,18 @@ tools = [
         }
     },
     {
-        "name": "get_tasks",
-        "description": "Get all tasks from the user's task list.",
-        "input_schema": {
-            "type": "object",
-            "properties": {}
-        }
-    },
-    {
-        "name": "complete_task",
-        "description": "Mark a task as complete by its ID number.",
+        "name": "complete_tasks",
+        "description": "Complete and remove one or more tasks by their titles.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "task_id": {"type": "integer", "description": "The ID of the task to mark as done"}
+                "task_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of task names to complete"
+                }
             },
-            "required": ["task_id"]
-        }
-    },
-    {
-        "name": "clear_completed",
-        "description": "Remove all completed tasks from the user's task list.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
+            "required": ["task_names"]
         }
     }
 ]
@@ -129,16 +137,17 @@ tools = [
 # ─── Tool router ──────────────────────────────────────────────────────────────
 
 def run_tool(tool_name, tool_input):
-    if tool_name == "add_task":
-        return add_task(tool_input["title"])
-    elif tool_name == "delete_task":
-        return delete_task(tool_input["title"])
-    elif tool_name == "get_tasks":
-        return get_tasks()
-    elif tool_name == "complete_task":
-        return complete_task(tool_input["task_id"])
+    tool_map = {
+        "search_tasks": lambda: search_tasks(tool_input["keyword"]),
+        "get_tasks": lambda: get_tasks(),
+        "add_task": lambda: add_task(tool_input["title"]),
+        "complete_tasks": lambda: complete_tasks(tool_input["task_names"]),
+        "delete_task": lambda: delete_task(tool_input["title"]),
+    }
+    tool_fn = tool_map.get(tool_name)
+    if tool_fn:
+        return tool_fn()
     return "Unknown tool."
-
 # ─── Claude with tool use ─────────────────────────────────────────────────────
 
 def ask_claude(user_message):
