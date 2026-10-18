@@ -74,6 +74,18 @@ def complete_tasks(task_names):
     save_tasks(tasks)
     return f"Completed and removed: {', '.join(titles)}"
 
+def remember(category, content):
+    from database import save_memory
+    save_memory(category, content)
+    return f"Got it, I'll remember that: [{category}] {content}"
+
+def recall():
+    from database import load_memories
+    memories = load_memories()
+    if not memories:
+        return "I don't have any memories yet."
+    return memories
+
 # ─── Tool definitions (what Claude sees) ──────────────────────────────────────
 
 tools = [
@@ -131,8 +143,28 @@ tools = [
             },
             "required": ["task_names"]
         }
+    },
+    {
+        "name": "remember",
+        "description": "Save something important to memory for future sessions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {"type": "string", "description": "Category of the memory e.g. 'personal', 'preference', 'work'"},
+                "content": {"type": "string", "description": "The thing to remember"}
+            },
+            "required": ["category", "content"]
+        }
+    },
+    {
+        "name": "recall",
+        "description": "Recall everything stored in memory about the user.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
     }
-]
+    ]
 
 # ─── Tool router ──────────────────────────────────────────────────────────────
 
@@ -143,6 +175,8 @@ def run_tool(tool_name, tool_input):
         "add_task": lambda: add_task(tool_input["title"]),
         "complete_tasks": lambda: complete_tasks(tool_input["task_names"]),
         "delete_task": lambda: delete_task(tool_input["title"]),
+        "remember": lambda: remember(tool_input["category"], tool_input["content"]),
+        "recall": lambda: recall(),
     }
     tool_fn = tool_map.get(tool_name)
     if tool_fn:
@@ -151,12 +185,20 @@ def run_tool(tool_name, tool_input):
 # ─── Claude with tool use ─────────────────────────────────────────────────────
 
 def ask_claude(user_message):
+    from database import load_memories
+    memories = load_memories()
+
+    system_prompt = "You are a helpful personal productivity assistant. Be concise since your responses will be spoken aloud. You can manage the user's task list using your tools."
+
+    if memories:
+        system_prompt += f"\n\nWhat you remember about the user:\n{memories}"
+
     conversation_history.append({"role": "user", "content": user_message})
 
     response = anthropic_client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1000,
-        system="You are a helpful personal productivity assistant. Be concise since your responses will be spoken aloud. You can manage the user's task list using your tools.",
+        system=system_prompt,
         tools=tools,
         messages=conversation_history
     )
@@ -176,20 +218,17 @@ def ask_claude(user_message):
                     "content": result
                 })
 
-        # Add Claude's tool call + results to history
         conversation_history.append({"role": "assistant", "content": response.content})
         conversation_history.append({"role": "user", "content": tool_results})
 
-        # Ask Claude again with the tool results
         response = anthropic_client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1000,
-            system="You are a helpful personal productivity assistant. Be concise since your responses will be spoken aloud. You can manage the user's task list using your tools.",
+            system=system_prompt,
             tools=tools,
             messages=conversation_history
         )
 
-    # Final text reply
     reply = next(b.text for b in response.content if hasattr(b, "text"))
     conversation_history.append({"role": "assistant", "content": reply})
     return reply
