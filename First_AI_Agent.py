@@ -7,6 +7,7 @@ import numpy as np
 from scipy.io.wavfile import write
 from dotenv import load_dotenv
 from database import save_conversation_summary, save_memory,load_memories
+from web_tools import search_web, get_weather, get_news
 
 load_dotenv()
 
@@ -191,7 +192,40 @@ tools = [
             "type": "object",
             "properties": {}
         }
+    },
+{
+    "name": "search_web",
+    "description": "Search the internet for current information on any topic.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "The search query"}
+        },
+        "required": ["query"]
     }
+},
+{
+    "name": "get_weather",
+    "description": "Get current weather for a city.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "city": {"type": "string", "description": "The city name"}
+        },
+        "required": ["city"]
+    }
+},
+{
+    "name": "get_news",
+    "description": "Get latest news headlines for a topic.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "topic": {"type": "string", "description": "The news topic"}
+        },
+        "required": ["topic"]
+    }
+}
     ]
 
 # ─── Tool router ──────────────────────────────────────────────────────────────
@@ -206,6 +240,9 @@ def run_tool(tool_name, tool_input):
         "remember": lambda: remember(tool_input["category"], tool_input["content"]),
         "recall": lambda: recall(),
         "summarise_and_save": lambda: summarise_and_save(),
+        "search_web": lambda: search_web(tool_input["query"]),
+        "get_weather": lambda: get_weather(tool_input["city"]),
+        "get_news": lambda: get_news(tool_input["topic"]),
     }
     tool_fn = tool_map.get(tool_name)
     if tool_fn:
