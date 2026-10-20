@@ -6,6 +6,7 @@ import sounddevice as sd
 import numpy as np
 from scipy.io.wavfile import write
 from dotenv import load_dotenv
+from database import save_conversation_summary, save_memory,load_memories
 
 load_dotenv()
 
@@ -75,16 +76,35 @@ def complete_tasks(task_names):
     return f"Completed and removed: {', '.join(titles)}"
 
 def remember(category, content):
-    from database import save_memory
     save_memory(category, content)
     return f"Got it, I'll remember that: [{category}] {content}"
 
 def recall():
-    from database import load_memories
     memories = load_memories()
     if not memories:
         return "I don't have any memories yet."
     return memories
+
+def summarise_and_save():
+    if not conversation_history:
+        return
+
+    # Build a fresh summary request — don't use conversation_history directly
+    response = anthropic_client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=200,
+        system="You are a helpful assistant that summarises conversations.",
+        messages=[
+            {
+                "role": "user",
+                "content": f"Please summarise this conversation in 2-3 sentences. Focus on what the user did and any important information shared.\n\n{str(conversation_history)}"
+            }
+        ]
+    )
+
+    summary = response.content[0].text
+    save_conversation_summary(summary)
+    print(f"📝 Session saved: {summary}")
 
 # ─── Tool definitions (what Claude sees) ──────────────────────────────────────
 
@@ -163,6 +183,14 @@ tools = [
             "type": "object",
             "properties": {}
         }
+    },
+    {
+        "name": "summarise_and_save",
+        "description": "Summarize and save the conversation history.",
+        "input_schema": {
+            "type": "object",
+            "properties": {}
+        }
     }
     ]
 
@@ -177,6 +205,7 @@ def run_tool(tool_name, tool_input):
         "delete_task": lambda: delete_task(tool_input["title"]),
         "remember": lambda: remember(tool_input["category"], tool_input["content"]),
         "recall": lambda: recall(),
+        "summarise_and_save": lambda: summarise_and_save(),
     }
     tool_fn = tool_map.get(tool_name)
     if tool_fn:
@@ -260,6 +289,7 @@ def main():
     while True:
         user_input = input("Press Enter to speak (or type 'quit'): ")
         if user_input.lower() == 'quit':
+            summarise_and_save()
             print("Goodbye!")
             break
         record_audio(duration=5)
