@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from database import save_conversation_summary, save_memory,load_memories
 from web_tools import search_web, get_weather, get_news
 from google_tools import get_emails, send_email,get_calendar_events, create_calendar_event
+from aoutonomous import run_autonomous_task
 
 load_dotenv()
 
@@ -378,7 +379,14 @@ def speak(text):
 def main():
     print("🤖 Personal Agent ready! Press Enter to speak, type 'quit' to exit.\n")
     while True:
-        user_input = input("Press Enter to speak (or type 'quit'): ")
+        user_input = input("Press Enter to speak, type 'auto' for autonomous task, or 'quit': ")
+
+        if user_input.lower() == 'auto':
+            goal = input("What's the goal? → ")
+            result = run_autonomous_task(goal, tools, run_tool, anthropic_client)
+            print(f"\n📋 Result:\n{result}\n")
+            speak(result)
+            continue
         if user_input.lower() == 'quit':
             summarise_and_save()
             print("Goodbye!")
