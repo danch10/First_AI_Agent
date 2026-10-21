@@ -384,6 +384,8 @@ def main():
         if user_input.lower() == 'auto':
             goal = input("What's the goal? → ")
             result = run_autonomous_task(goal, tools, run_tool, anthropic_client)
+            conversation_history.append({"role": "user", "content": goal})
+            conversation_history.append({"role": "assistant", "content": result})
             print(f"\n📋 Result:\n{result}\n")
             speak(result)
             continue
