@@ -8,6 +8,7 @@ from scipy.io.wavfile import write
 from dotenv import load_dotenv
 from database import save_conversation_summary, save_memory,load_memories
 from web_tools import search_web, get_weather, get_news
+from google_tools import get_emails, send_email,get_calendar_events, create_calendar_event
 
 load_dotenv()
 
@@ -225,8 +226,57 @@ tools = [
         },
         "required": ["topic"]
     }
-}
-    ]
+},
+{
+    "name": "get_emails",
+    "description": "Get all emails for number of results asked for.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "max_results": {"type": "integer", "description": "The maximum number of results"}
+        },
+        "required": ["max_results"]
+    }
+},
+    {
+        "name": "send_email",
+        "description": "Send an email based on the information given.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string", "description": "Email address"},
+                "subject": {"type": "string", "description": "Email subject"},
+                "body": {"type": "string", "description": "Email body"}
+            },
+            "required": ["to", "subject", "body"]
+        }
+    },
+    {
+        "name": "get_calendar_events",
+        "description": "Get all calendar events for a topic.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days_ahead": {"type": "integer", "description": "Days ahead"}
+            },
+            "required": ["days_ahead"]
+        }
+    },
+    {
+        "name": "create_calendar_event",
+        "description": "Create a calendar event for a topic.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "The calendar event title"},
+                "date": {"type": "string", "description": "The calendar event date"},
+                "time": {"type": "string", "description": "The calendar event time"},
+                "duration_hours": {"type": "integer", "description": "The calendar event duration hours"}
+            },
+            "required": ["title", "date", "time", "duration_hours"]
+        }
+    }
+]
 
 # ─── Tool router ──────────────────────────────────────────────────────────────
 
@@ -243,6 +293,10 @@ def run_tool(tool_name, tool_input):
         "search_web": lambda: search_web(tool_input["query"]),
         "get_weather": lambda: get_weather(tool_input["city"]),
         "get_news": lambda: get_news(tool_input["topic"]),
+        "get_emails": lambda: get_emails(tool_input["max_results"]),
+        "send_email": lambda: send_email(tool_input["to"], tool_input["subject"], tool_input["body"]),
+        "get_calendar_events": lambda: get_calendar_events(tool_input["days_ahead"]),
+        "create_calendar_event": lambda: create_calendar_event(tool_input["title"], tool_input["date"], tool_input["time"], tool_input["duration_hours"]),
     }
     tool_fn = tool_map.get(tool_name)
     if tool_fn:
